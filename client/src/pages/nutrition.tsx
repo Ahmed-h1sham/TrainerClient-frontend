@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useAppStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Utensils, 
   Apple, 
@@ -11,10 +13,107 @@ import {
   Moon, 
   Plus, 
   ChevronRight,
-  Info
+  Info,
+  TrendingUp,
+  AlertTriangle,
+  Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function NutritionPage() {
+  const { user } = useAppStore();
+
+  // Mock data for trainer view
+  const trainerNutritionClients = [
+    { id: 1, name: "Alex Client", goal: 2400, today: 1850, protein: 140, carbs: 200, fats: 65, adherence: 95, status: "good", img: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80" },
+    { id: 2, name: "Sarah Smith", goal: 1800, today: 1200, protein: 110, carbs: 150, fats: 50, adherence: 88, status: "good", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" },
+    { id: 3, name: "Mike Jones", goal: 3000, today: 3200, protein: 180, carbs: 400, fats: 90, adherence: 70, status: "warning", img: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=100&q=80" },
+    { id: 4, name: "Emily Wilson", goal: 2000, today: 1950, protein: 130, carbs: 180, fats: 60, adherence: 98, status: "good", img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80" },
+  ];
+
+  // Trainer View
+  if (user?.role === 'trainer') {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Client Nutrition</h1>
+            <p className="text-muted-foreground">Track client meal logs and macro targets.</p>
+          </div>
+          <Button>
+            <Utensils className="h-4 w-4 mr-2" />
+            Update Plans
+          </Button>
+        </div>
+
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search clients..." className="pl-8 h-9" />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {trainerNutritionClients.map(client => (
+            <Card key={client.id} className="overflow-hidden hover:border-primary/50 transition-colors">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={client.img} />
+                      <AvatarFallback>{client.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-bold text-sm">{client.name}</h3>
+                      <p className="text-xs text-muted-foreground">Goal: {client.goal} kcal</p>
+                    </div>
+                  </div>
+                  {client.status === 'warning' && (
+                    <Badge variant="destructive" className="gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Review
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Calories Today</span>
+                      <span className="font-medium">{client.today} / {client.goal}</span>
+                    </div>
+                    <Progress 
+                      value={(client.today / client.goal) * 100} 
+                      className={`h-2 ${client.today > client.goal ? "bg-red-100 [&>div]:bg-red-500" : ""}`} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                      <span className="block text-blue-700 dark:text-blue-300 font-bold">{client.protein}g</span>
+                      <span className="text-blue-600/70 dark:text-blue-400/70">Protein</span>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded">
+                      <span className="block text-green-700 dark:text-green-300 font-bold">{client.carbs}g</span>
+                      <span className="text-green-600/70 dark:text-green-400/70">Carbs</span>
+                    </div>
+                    <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
+                      <span className="block text-orange-700 dark:text-orange-300 font-bold">{client.fats}g</span>
+                      <span className="text-orange-600/70 dark:text-orange-400/70">Fats</span>
+                    </div>
+                  </div>
+
+                  <Button variant="ghost" size="sm" className="w-full mt-2 text-xs">
+                    View Full Diary <ChevronRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Client View Logic
   const meals = {
     breakfast: [
       { name: "Oatmeal with Berries", calories: 350, protein: "12g", carbs: "60g", fats: "6g" },
