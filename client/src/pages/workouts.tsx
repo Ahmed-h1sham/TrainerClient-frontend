@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MOCK_WORKOUTS, useAppStore } from "@/lib/store";
+import { useAppStore, type User, type Workout } from "@/lib/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,9 @@ import {
   Filter,
   MoreHorizontal,
   Search,
-  AlertCircle
+  AlertCircle,
+  X,
+  Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
@@ -27,22 +29,80 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 
 export default function WorkoutsPage() {
-  const { user } = useAppStore();
+  const { user, workouts, clients } = useAppStore();
   const [, setLocation] = useLocation();
-  const [selectedWorkout, setSelectedWorkout] = useState<typeof MOCK_WORKOUTS[0] | null>(null);
-
-  // Mock data for trainer view
-  const trainerClients = [
-    { id: 1, name: "Alex Client", plan: "Hypertrophy A", lastWorkout: "Today", compliance: 92, status: "completed", img: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80" },
-    { id: 2, name: "Sarah Smith", plan: "Fat Loss B", lastWorkout: "Yesterday", compliance: 85, status: "pending", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" },
-    { id: 3, name: "Mike Jones", plan: "Marathon Prep", lastWorkout: "2 days ago", compliance: 60, status: "missed", img: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=100&q=80" },
-    { id: 4, name: "Emily Wilson", plan: "Tone & Sculpt", lastWorkout: "Today", compliance: 98, status: "completed", img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80" },
-  ];
+  const [selectedWorkout, setSelectedWorkout] = useState<typeof workouts[0] | null>(null);
 
   // Trainer View
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [currentClient, setCurrentClient] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClientForAssign, setSelectedClientForAssign] = useState<User | null>(null);
+  const [exercises, setExercises] = useState<{name: string, sets: number, reps: string, weight: string, rest: string}[]>([]);
+
+  const { assignWorkout: assignWorkoutAction } = useAppStore();
+
+  const handleAssignClick = () => {
+    setSelectedClientForAssign(null);
+    setExercises([]);
+    setAssignOpen(true);
+  };
+
+  const addExerciseField = () => {
+    setExercises([...exercises, { name: "", sets: 3, reps: "10-12", weight: "", rest: "60s" }]);
+  };
+
+  const updateExercise = (index: number, field: string, value: any) => {
+    const updated = [...exercises];
+    updated[index] = { ...updated[index], [field]: value };
+    setExercises(updated);
+  };
+
+  const handleAssignWorkout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClientForAssign) {
+       toast.error("Please select a client");
+       return;
+    }
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const newWorkout: Workout = {
+      id: Math.random().toString(36).substr(2, 9),
+      userId: selectedClientForAssign.id,
+      title: formData.get('title') as string,
+      date: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      exercises: exercises.length > 0 ? exercises : [
+        { name: "Push Ups", sets: 3, reps: "15", rest: "60s" },
+        { name: "Squats", sets: 4, reps: "12", weight: "20kg", rest: "60s" }
+      ]
+    };
+    
+    assignWorkoutAction(selectedClientForAssign.id, newWorkout);
+    setAssignOpen(false);
+    setExercises([]);
+    toast.success(`Workout assigned to ${selectedClientForAssign.name}`);
+  };
+
+  const filteredClients = clients.filter(c => 
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
   if (user?.role === 'trainer') {
     return (
       <div className="space-y-8">
@@ -52,11 +112,11 @@ export default function WorkoutsPage() {
             <p className="text-muted-foreground">Monitor client adherence and assign new plans.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => toast.info("Filter feature coming soon")}>
               <Filter className="h-4 w-4" />
               Filter
             </Button>
-            <Button>
+            <Button onClick={handleAssignClick}>
               <Dumbbell className="h-4 w-4 mr-2" />
               Assign Workout
             </Button>
@@ -69,7 +129,12 @@ export default function WorkoutsPage() {
               <CardTitle>Client Progress</CardTitle>
               <div className="relative w-64">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search clients..." className="pl-8 h-9" />
+                <Input 
+                  placeholder="Search clients..." 
+                  className="pl-8 h-9" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
             </div>
           </CardHeader>
@@ -78,72 +143,204 @@ export default function WorkoutsPage() {
               <thead className="text-xs text-muted-foreground bg-muted/50 uppercase">
                 <tr>
                   <th className="px-6 py-3">Client</th>
-                  <th className="px-6 py-3">Current Plan</th>
-                  <th className="px-6 py-3">Latest Status</th>
-                  <th className="px-6 py-3">Adherence</th>
+                  <th className="px-6 py-3">Goals</th>
+                  <th className="px-6 py-3">Metrics</th>
                   <th className="px-6 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {trainerClients.map((client) => (
+                {filteredClients.length > 0 ? filteredClients.map((client) => (
                   <tr key={client.id} className="border-b hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 font-medium">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={client.img} />
+                          <AvatarImage src={client.avatar} />
                           <AvatarFallback>{client.name[0]}</AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="text-foreground">{client.name}</div>
-                          <div className="text-xs text-muted-foreground">Last seen: {client.lastWorkout}</div>
+                          <div className="text-xs text-muted-foreground">{client.email}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">{client.plan}</td>
+                    <td className="px-6 py-4">{client.goals?.join(", ")}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {client.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                        {client.status === 'pending' && <Clock className="h-4 w-4 text-yellow-500" />}
-                        {client.status === 'missed' && <AlertCircle className="h-4 w-4 text-red-500" />}
-                        <span className="capitalize text-muted-foreground">{client.status}</span>
-                      </div>
+                      {client.metrics ? `${client.metrics.weight}kg • ${client.metrics.height}cm` : '--'}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={cn("h-full rounded-full", 
-                              client.compliance > 90 ? "bg-green-500" : 
-                              client.compliance > 75 ? "bg-yellow-500" : "bg-red-500"
-                            )} 
-                            style={{ width: `${client.compliance}%` }} 
-                          />
-                        </div>
-                        <span className="text-xs">{client.compliance}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="sm">View Log</Button>
+                    <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                       <Button variant="outline" size="sm" onClick={() => { 
+                         setSelectedClientForAssign(client);
+                         setExercises([]);
+                         setAssignOpen(true);
+                       }}>Assign</Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setCurrentClient(client); setHistoryOpen(true); }}>View Log</Button>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                      No clients found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </CardContent>
         </Card>
+        
+        {/* Assign Dialog */}
+        <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Assign Workout {selectedClientForAssign ? `to ${selectedClientForAssign.name}` : ''}</DialogTitle>
+              <DialogDescription>Create a customized workout plan.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAssignWorkout} className="space-y-4">
+              {!selectedClientForAssign && (
+                <div className="space-y-2">
+                  <Label>Select Client</Label>
+                  <Select onValueChange={(val: string) => setSelectedClientForAssign(clients.find(c => c.id === val) || null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="title">Workout Title</Label>
+                <Input id="title" name="title" required placeholder="e.g., Upper Body Blast" />
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Exercises</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addExerciseField}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Exercise
+                  </Button>
+                </div>
+                
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                  {exercises.map((ex, idx) => (
+                    <div key={idx} className="p-3 bg-muted/40 rounded-lg space-y-2 relative border">
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => setExercises(exercises.filter((_, i) => i !== idx))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Name</Label>
+                          <Input 
+                            value={ex.name} 
+                            onChange={(e) => updateExercise(idx, 'name', e.target.value)} 
+                            placeholder="Bench Press" 
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Sets</Label>
+                          <Input 
+                            type="number" 
+                            value={ex.sets} 
+                            onChange={(e) => updateExercise(idx, 'sets', Number(e.target.value))} 
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Reps</Label>
+                          <Input 
+                            value={ex.reps} 
+                            onChange={(e) => updateExercise(idx, 'reps', e.target.value)} 
+                            placeholder="8-12" 
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Weight</Label>
+                          <Input 
+                            value={ex.weight} 
+                            onChange={(e) => updateExercise(idx, 'weight', e.target.value)} 
+                            placeholder="20kg" 
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Rest</Label>
+                          <Input 
+                            value={ex.rest} 
+                            onChange={(e) => updateExercise(idx, 'rest', e.target.value)} 
+                            placeholder="60s" 
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {exercises.length === 0 && (
+                    <div className="p-4 bg-muted/30 rounded-lg space-y-2 border-dashed border-2 text-center text-muted-foreground text-sm">
+                      No exercises added yet. Use the "Add Exercise" button above.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setAssignOpen(false); setExercises([]); }}>Cancel</Button>
+                <Button type="submit">Assign Workout</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Log Dialog */}
+        <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+           <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>{currentClient?.name}'s History</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                 {workouts.filter(w => w.userId === currentClient?.id && w.status === 'completed').length > 0 ? (
+                    workouts.filter(w => w.userId === currentClient?.id && w.status === 'completed').map(w => (
+                      <div key={w.id} className="border p-4 rounded-lg flex justify-between items-center">
+                         <div>
+                           <h4 className="font-bold">{w.title}</h4>
+                           <p className="text-xs text-muted-foreground">{new Date(w.date).toLocaleDateString()}</p>
+                         </div>
+                         <Badge variant="outline" className="bg-green-50 text-green-700">Completed</Badge>
+                      </div>
+                    ))
+                 ) : (
+                   <p className="text-center text-muted-foreground py-8">No completed workouts found for this client.</p>
+                 )}
+              </div>
+           </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
   // Client View Logic
-  const activeWorkouts = MOCK_WORKOUTS.filter(w => w.status === 'pending');
-  const completedWorkouts = MOCK_WORKOUTS.filter(w => w.status === 'completed');
+  const activeWorkouts = workouts.filter(w => w.userId === user?.id && w.status === 'pending');
+  const completedWorkouts = workouts.filter(w => w.userId === user?.id && w.status === 'completed');
 
   const handleStartWorkout = (id: string) => {
     setLocation(`/workout/${id}/active`);
   };
 
-  const WorkoutCard = ({ workout }: { workout: typeof MOCK_WORKOUTS[0] }) => (
+  const WorkoutCard = ({ workout }: { workout: typeof workouts[0] }) => (
     <Card className="hover:border-primary/50 transition-all cursor-pointer group overflow-hidden" onClick={() => setSelectedWorkout(workout)}>
       <div className="flex flex-col md:flex-row">
         <div className="h-32 md:h-auto w-full md:w-32 bg-muted flex items-center justify-center shrink-0 relative group-hover:bg-primary/5 transition-colors">

@@ -1,7 +1,10 @@
-import { useAppStore, MOCK_WORKOUTS } from "@/lib/store";
+import { useState } from "react";
+import { useAppStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   CalendarCheck, 
   TrendingUp, 
@@ -12,12 +15,37 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function ClientDashboard() {
-  const { user } = useAppStore();
+  const { user, workouts, logWeight } = useAppStore();
   const [, setLocation] = useLocation();
-  const todayWorkout = MOCK_WORKOUTS.find(w => w.date === new Date().toISOString().split('T')[0]);
-  const upcomingWorkouts = MOCK_WORKOUTS.filter(w => w.status === 'pending' && w.id !== todayWorkout?.id);
+  const [isWeightDialogOpen, setIsWeightDialogOpen] = useState(false);
+  
+  // Use store workouts instead of mock constant
+  const todayWorkout = workouts.find(w => w.date === new Date().toISOString().split('T')[0] && w.userId === user?.id);
+  const upcomingWorkouts = workouts.filter(w => w.userId === user?.id && w.status === 'pending' && w.id !== todayWorkout?.id);
+  const completedWorkouts = workouts.filter(w => w.userId === user?.id && w.status === 'completed');
+
+  const handleLogWeight = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const weight = parseFloat(formData.get('weight') as string);
+    if (weight) {
+      logWeight(weight);
+      setIsWeightDialogOpen(false);
+      toast.success("Weight logged successfully!");
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -28,8 +56,8 @@ export default function ClientDashboard() {
           <p className="text-muted-foreground">Ready to crush your goals today?</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">View Progress</Button>
-          <Button>Find Workout</Button>
+          <Button variant="outline" onClick={() => setLocation("/profile")}>View Progress</Button>
+          <Button onClick={() => setLocation("/workouts")}>All Workouts</Button>
         </div>
       </div>
 
@@ -42,7 +70,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Workouts Completed</p>
-              <h3 className="text-2xl font-bold">12</h3>
+              <h3 className="text-2xl font-bold">{completedWorkouts.length}</h3>
             </div>
           </CardContent>
         </Card>
@@ -52,8 +80,8 @@ export default function ClientDashboard() {
               <TrendingUp className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Weight Change</p>
-              <h3 className="text-2xl font-bold text-green-600">-2.5 kg</h3>
+              <p className="text-sm font-medium text-muted-foreground">Current Weight</p>
+              <h3 className="text-2xl font-bold text-green-600">{user?.metrics?.weight || "--"} kg</h3>
             </div>
           </CardContent>
         </Card>
@@ -113,10 +141,17 @@ export default function ClientDashboard() {
                   ))}
                 </div>
                 <div className="mt-6">
-                  <Button className="w-full gap-2 h-12 text-lg" onClick={() => setLocation(`/workout/${todayWorkout.id}/active`)}>
-                    <PlayCircle className="h-5 w-5" />
-                    Start Workout
-                  </Button>
+                  {todayWorkout.status === 'completed' ? (
+                     <Button className="w-full gap-2 h-12 text-lg bg-green-600 hover:bg-green-700" disabled>
+                        <CalendarCheck className="h-5 w-5" />
+                        Workout Complete!
+                     </Button>
+                  ) : (
+                    <Button className="w-full gap-2 h-12 text-lg" onClick={() => setLocation(`/workout/${todayWorkout.id}/active`)}>
+                      <PlayCircle className="h-5 w-5" />
+                      Start Workout
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -168,7 +203,7 @@ export default function ClientDashboard() {
           <h2 className="text-xl font-semibold">Upcoming</h2>
           <Card>
             <CardContent className="p-0">
-              {upcomingWorkouts.map((workout, i) => (
+              {upcomingWorkouts.length > 0 ? upcomingWorkouts.map((workout, i) => (
                 <div key={workout.id} className={cn("p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors cursor-pointer", i !== upcomingWorkouts.length - 1 && "border-b")}>
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center text-primary text-xs font-bold">
                     <span>{new Date(workout.date).getDate()}</span>
@@ -180,24 +215,47 @@ export default function ClientDashboard() {
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-              ))}
+              )) : (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  No upcoming workouts assigned.
+                </div>
+              )}
               <div className="p-4 border-t">
-                <Button variant="ghost" className="w-full text-sm" size="sm">View Full Schedule</Button>
+                <Button variant="ghost" className="w-full text-sm" size="sm" onClick={() => setLocation("/schedule")}>View Full Schedule</Button>
               </div>
             </CardContent>
           </Card>
 
           <h2 className="text-xl font-semibold pt-4">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
-              <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                <div className="h-10 w-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <TrendingUp className="h-5 w-5" />
-                </div>
-                <span className="text-xs font-medium">Log Weight</span>
-              </CardContent>
-            </Card>
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
+            <Dialog open={isWeightDialogOpen} onOpenChange={setIsWeightDialogOpen}>
+              <DialogTrigger asChild>
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
+                  <CardContent className="p-4 flex flex-col items-center text-center gap-2">
+                    <div className="h-10 w-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-medium">Log Weight</span>
+                  </CardContent>
+                </Card>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Log Today's Weight</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleLogWeight} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="weight">Weight (kg)</Label>
+                    <Input id="weight" name="weight" type="number" step="0.1" required placeholder="e.g. 75.5" defaultValue={user?.metrics?.weight} />
+                  </div>
+                  <DialogFooter>
+                     <Button type="submit">Save</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+            
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer group" onClick={() => setLocation("/workouts")}>
               <CardContent className="p-4 flex flex-col items-center text-center gap-2">
                 <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Clock className="h-5 w-5" />

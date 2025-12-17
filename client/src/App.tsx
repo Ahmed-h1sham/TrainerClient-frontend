@@ -40,6 +40,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/signup" component={AuthPage} />
       
       <Route path="/">
         {user ? <Redirect to={user.role === "trainer" ? "/trainer" : "/dashboard"} /> : <Redirect to="/auth" />}

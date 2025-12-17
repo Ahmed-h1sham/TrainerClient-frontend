@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,38 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from "recharts";
-import { Camera, Settings, LogOut } from "lucide-react";
+import { Camera, LogOut } from "lucide-react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 export default function ProfilePage() {
-  const { user, setUser } = useAppStore();
+  const { user, setUser, updateUser } = useAppStore();
+  const [, setLocation] = useLocation();
+
+  const handleLogout = () => {
+    setUser(null);
+    setLocation("/auth");
+  };
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const firstName = formData.get('firstName') as string;
+    const lastName = formData.get('lastName') as string;
+    const email = formData.get('email') as string;
+    const bio = formData.get('bio') as string;
+    
+    // Parse name simply
+    const name = `${firstName} ${lastName}`.trim();
+    
+    updateUser({
+      name,
+      email,
+      goals: bio.split(',').map(g => g.trim())
+    });
+    
+    toast.success("Profile updated successfully!");
+  };
 
   const weightData = [
     { date: "Jan", weight: 82 },
@@ -30,6 +59,10 @@ export default function ProfilePage() {
     { date: "Jun", weight: 75 },
   ];
 
+  if (!user) return null;
+
+  const [firstName, lastName] = user.name.split(" ");
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -37,7 +70,7 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
           <p className="text-muted-foreground">Manage your account and settings.</p>
         </div>
-        <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => { setUser(null); window.location.href = '/auth'; }}>
+        <Button variant="outline" className="text-destructive hover:text-destructive" onClick={handleLogout}>
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
         </Button>
@@ -70,15 +103,15 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                 <span className="text-sm text-muted-foreground">Height</span>
-                <span className="font-medium">{user?.metrics?.height || 180} cm</span>
+                <span className="font-medium">{user?.metrics?.height || "--"} cm</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                 <span className="text-sm text-muted-foreground">Weight</span>
-                <span className="font-medium">{user?.metrics?.weight || 75} kg</span>
+                <span className="font-medium">{user?.metrics?.weight || "--"} kg</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                 <span className="text-sm text-muted-foreground">Age</span>
-                <span className="font-medium">{user?.metrics?.age || 28} yrs</span>
+                <span className="font-medium">{user?.metrics?.age || "--"} yrs</span>
               </div>
             </CardContent>
           </Card>
@@ -145,28 +178,30 @@ export default function ProfilePage() {
                   <CardTitle>Personal Information</CardTitle>
                   <CardDescription>Update your personal details.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First name</Label>
-                      <Input id="firstName" defaultValue="Alex" />
+                <CardContent>
+                  <form onSubmit={handleUpdateProfile} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First name</Label>
+                        <Input id="firstName" name="firstName" defaultValue={firstName} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last name</Label>
+                        <Input id="lastName" name="lastName" defaultValue={lastName} />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last name</Label>
-                      <Input id="lastName" defaultValue="Client" />
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" name="email" defaultValue={user.email} />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" defaultValue="alex@example.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Fitness Goals</Label>
-                    <Input id="bio" defaultValue="Build Muscle, Improve Stamina" />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button>Save Changes</Button>
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Fitness Goals</Label>
+                      <Input id="bio" name="bio" defaultValue={user.goals?.join(", ")} />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="submit">Save Changes</Button>
+                    </div>
+                  </form>
                 </CardContent>
               </Card>
               

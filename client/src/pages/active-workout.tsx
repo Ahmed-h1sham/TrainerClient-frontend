@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
-import { MOCK_WORKOUTS } from "@/lib/store";
+import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Clock, 
-  ChevronLeft, 
-  Play, 
-  Pause, 
-  CheckCircle2, 
+import {
+  Clock,
+  ChevronLeft,
+  Play,
+  Pause,
+  CheckCircle2,
   RotateCcw,
   X
 } from "lucide-react";
@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function ActiveWorkoutPage() {
+  const { workouts, completeWorkout } = useAppStore();
   const [, params] = useRoute("/workout/:id/active");
   const [, setLocation] = useLocation();
   const workoutId = params?.id;
-  const workout = MOCK_WORKOUTS.find(w => w.id === workoutId);
+  const workout = workouts.find(w => w.id === workoutId);
 
   const [time, setTime] = useState(0);
   const [isActive, setIsActive] = useState(true);
@@ -72,8 +73,10 @@ export default function ActiveWorkoutPage() {
   };
 
   const handleFinish = () => {
-    // In a real app, save data here
-    setLocation("/workouts");
+    if (workoutId) {
+      completeWorkout(workoutId);
+    }
+    setLocation("/dashboard");
   };
 
   return (
